@@ -1,4 +1,4 @@
-import lzma
+﻿import lzma
 import struct
 from io import BytesIO
 from .asset import Asset
@@ -15,6 +15,7 @@ class AssetBundle:
 	def __init__(self, environment):
 		self.environment = environment
 		self.assets = []
+		self.block_storage_file_offset = -1
 
 	def __repr__(self):
 		if hasattr(self, "name"):
@@ -118,10 +119,13 @@ class AssetBundle:
 			nodes.append((ofs, size, status, name))
 
 		storage = ArchiveBlockStorage(blocks, buf)
+		self.block_storage_file_offset = storage.basepos
 		for ofs, size, status, name in nodes:
 			storage.seek(ofs)
 			asset = Asset.from_bundle(self, storage)
 			asset.name = name
+			asset.block_storage_offset = ofs
+			asset.block_storage_size = size
 			self.assets.append(asset)
 
 		# Hacky

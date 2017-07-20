@@ -1,4 +1,4 @@
-import os
+﻿import os
 import logging
 import lzma
 from binascii import hexlify
@@ -73,6 +73,8 @@ class Asset:
 		self.long_object_ids = False
 		self.tree = TypeMetadata(self)
 		self.loaded = False
+		self.block_storage_offset = -1
+		self.block_storage_size = -1
 
 	def __repr__(self):
 		return "<%s %s>" % (self.__class__.__name__, self.name)
