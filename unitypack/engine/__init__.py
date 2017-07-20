@@ -1,4 +1,4 @@
-from .animation import (
+﻿from .animation import (
 	Animation, AnimationClip, Animator, AnimatorController, Motion,
 	ParticleAnimator, RuntimeAnimatorController
 )
@@ -13,3 +13,5 @@ from .physics import BoxCollider, BoxCollider2D, Collider, Collider2D, Rigidbody
 from .renderer import MeshRenderer, ParticleRenderer, ParticleSystemRenderer, Renderer
 from .text import TextAsset, TextMesh, Shader
 from .texture import Material, Sprite, Texture2D, StreamingInfo
+from .asset_bundle import AssetBundle
+

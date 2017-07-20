@@ -1,4 +1,4 @@
-from enum import IntEnum
+﻿from enum import IntEnum
 
 
 class CompressionType(IntEnum):
@@ -48,3 +48,7 @@ class RuntimePlatform(IntEnum):
 	PSMPlayer = 26
 	XboxOne = 27
 	SamsungTVPlayer = 28
+	WiiU = 30
+	tvOS = 31
+	Switch = 32
+	Unknown33 = 33
