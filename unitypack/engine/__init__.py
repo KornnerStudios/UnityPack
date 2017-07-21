@@ -14,4 +14,5 @@ from .renderer import MeshRenderer, ParticleRenderer, ParticleSystemRenderer, Re
 from .text import TextAsset, TextMesh, Shader
 from .texture import Material, Sprite, Texture2D, StreamingInfo
 from .asset_bundle import AssetBundle
+from .preload_data import PreloadData
 

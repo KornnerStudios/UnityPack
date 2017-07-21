@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 from collections import OrderedDict
 from io import BytesIO
 from . import engine as UnityEngine
@@ -48,7 +48,12 @@ class ObjectInfo:
 				return type_trees[self.type_id]
 			elif self.class_id in type_trees:
 				return type_trees[self.class_id]
-			return TypeMetadata.default(self.asset).type_trees[self.class_id]
+
+			type_trees_alias = TypeMetadata.default(self.asset).type_trees
+			if self.class_id not in type_trees_alias:
+				return None
+
+			return type_trees_alias[self.class_id]
 		return self.asset.types[self.type_id]
 
 	def load(self, buf):
@@ -79,9 +84,34 @@ class ObjectInfo:
 
 	def read(self):
 		buf = self.asset._buf
+		try:
+			buf.seek(self.asset._buf_ofs + self.data_offset)
+			object_buf = buf.read(self.size)
+			result = self.read_value(self.type_tree, BinaryReader(BytesIO(object_buf)))
+		except ValueError:
+			return self.read_name_only()
+		return result
+
+	def read_name_only(self):
+		buf = self.asset._buf
 		buf.seek(self.asset._buf_ofs + self.data_offset)
 		object_buf = buf.read(self.size)
-		return self.read_value(self.type_tree, BinaryReader(BytesIO(object_buf)))
+		return self.read_name(self.type_tree, BinaryReader(BytesIO(object_buf)))
+
+	def read_name(self, type, buf):
+		first_child = type.children[0] if type.children else TypeTree(self.asset.format)
+		t = first_child.type
+		if t == "string":
+			size = buf.read_uint()
+			result = buf.read_string(size)
+			align = type.children[0].post_align
+			dict = ({
+				first_child.name: result
+			})
+			return dict
+		else:
+			print("%r: first_child isn't a string (%r) and so we can't try to read the m_Name" % (self, t))
+			return None
 
 	def read_value(self, type, buf):
 		align = False
@@ -156,7 +186,7 @@ class ObjectInfo:
 		pos_after = buf.tell()
 		actual_size = pos_after - pos_before
 		if expected_size > 0 and actual_size < expected_size:
-			raise ValueError("Expected read_value(%r) to read %r bytes, but only read %r bytes" % (type, expected_size, actual_size))
+			raise ValueError("Expected read_value(%r in %r) to read %r bytes, but only read %r bytes" % (type, self, expected_size, actual_size))
 
 		if align or type.post_align:
 			buf.align()
@@ -189,6 +219,15 @@ class ObjectPointer:
 		if isinstance(ret, AssetRef):
 			ret = ret.resolve()
 		return ret
+
+	@property
+	def asset_path(self):
+		from .asset import AssetRef
+
+		ret = self.source_asset.asset_refs[self.file_id]
+		if isinstance(ret, AssetRef):
+			ret = ret.file_path
+		return None
 
 	@property
 	def object(self):

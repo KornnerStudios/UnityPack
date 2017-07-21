@@ -41,6 +41,9 @@
     <Compile Include="unitypack\engine\object.py" />
     <Compile Include="unitypack\engine\particle.py" />
     <Compile Include="unitypack\engine\physics.py" />
+    <Compile Include="unitypack\engine\preload_data.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="unitypack\engine\renderer.py" />
     <Compile Include="unitypack\engine\text.py" />
     <Compile Include="unitypack\engine\texture.py" />

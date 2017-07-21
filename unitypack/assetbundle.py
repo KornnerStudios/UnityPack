@@ -16,6 +16,7 @@ class AssetBundle:
 		self.environment = environment
 		self.assets = []
 		self.block_storage_file_offset = -1
+		self.compression_type = CompressionType.NONE
 
 	def __repr__(self):
 		if hasattr(self, "name"):
@@ -92,6 +93,7 @@ class AssetBundle:
 		self.uiblock_size = buf.read_uint()
 		flags = buf.read_uint()
 		compression = CompressionType(flags & 0x3F)
+		self.compression_type = compression
 		eof_metadata = flags & 0x80
 		if eof_metadata:
 			orig_pos = buf.tell()
