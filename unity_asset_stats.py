@@ -10,7 +10,6 @@ from unitypack.export import OBJMesh
 from unitypack.utils import extract_audioclip_samples
 import json
 
-
 class UnityAssetStats:
 	FORMAT_ARGS = {
 		"audio": "AudioClip",
@@ -30,7 +29,8 @@ class UnityAssetStats:
 
 	def parse_args(self, args):
 		p = ArgumentParser()
-		p.add_argument("files", nargs="+")
+		p.add_argument("--verbose", action="store_true", help="")
+		p.add_argument("files", nargs="*")
 		p.add_argument("--all", action="store_true", help="Extract all supported types")
 		for arg, clsname in self.FORMAT_ARGS.items():
 			p.add_argument("--" + arg, action="store_true", help="Extract %s" % (clsname))
@@ -39,6 +39,8 @@ class UnityAssetStats:
 		p.add_argument("--filter", nargs="*", help="Filter extraction for a specific name")
 		p.add_argument("-n", "--dry-run", action="store_true", help="Skip writing files")
 		p.add_argument("--art_dump", action="store_true", help="Dump info about art files (Textures, Meshes)")
+		p.add_argument("--path_to_assets", nargs="?", default="", help="Directory containing .asset files to process")
+		p.add_argument("--path_to_asset_bundles", nargs="?", default="", help="Directory containing .manifest files for asset bundles to process")
 		self.args = p.parse_args(args)
 
 		self.handle_formats = []
@@ -47,7 +49,14 @@ class UnityAssetStats:
 				self.handle_formats.append(classname)
 
 	def run(self):
-		for file in self.args.files:
+		files = self.args.files
+
+		self.populate_files_with_assets(files)
+		self.populate_files_with_asset_bundles(files)
+
+		for file in files:
+			print("Processing " + file + "...", end='')
+
 			# reset the json_data dict working memory on each file
 			self.json_data = {}
 
@@ -71,6 +80,7 @@ class UnityAssetStats:
 						with open(json_path, "w") as json_file:
 							json_file.write(json.dumps(self.json_data, indent=4))
 
+				print("Done")
 				continue
 
 			with open(file, "rb") as f:
@@ -97,7 +107,19 @@ class UnityAssetStats:
 					with open(json_path, "w") as json_file:
 						json_file.write(json.dumps(self.json_data, indent=4))
 
+			print("Done")
+
 		return 0
+
+	def populate_files_with_assets(self, files):
+		for file in [f for f in os.listdir(self.args.path_to_assets) if f.endswith('.assets')]:
+			files.append(os.path.join(self.args.path_to_assets, file))
+
+	def populate_files_with_asset_bundles(self, files):
+		for file in [f for f in os.listdir(self.args.path_to_asset_bundles) if f.endswith('.manifest')]:
+			file = os.path.join(self.args.path_to_asset_bundles, file)
+			file = file.replace(".manifest", "")
+			files.append(file)
 
 	def get_output_path(self, filename):
 		basedir = os.path.abspath(self.args.outdir)
@@ -134,27 +156,9 @@ class UnityAssetStats:
 
 		for id, obj in asset.objects.items():
 			if obj.type_tree is None:
-				print("Skipping unrecongized Object: #{0} class={1} data_offset={2}, size={3}".format(id, obj.class_id, obj.data_offset, obj.size))
+				if self.args.verbose:
+					print("Skipping unrecongized Object: #{0} class={1} data_offset={2}, size={3}".format(id, obj.class_id, obj.data_offset, obj.size))
 				continue
-
-			if self.args.dry_run:
-				if obj.type == "Texture2D":
-					d = obj.read_name_only()
-					name = None
-					if d is None:
-						pass
-					elif hasattr(d, 'name'):
-						name = d.name
-					else:
-						name = d['m_Name']
-					print("Object {0} {1} {2}".format(id, obj.type, name))
-				continue
-
-			if self.args.dry_run:
-				name = "NULL"
-				if hasattr(obj, 'name'):
-					name = obj.name
-				print("Object {0} {1} {2}".format(id, obj.type, name))
 
 			obj_json = None
 
@@ -207,7 +211,8 @@ class UnityAssetStats:
 
 		for id, obj in asset.objects.items():
 			if obj.type_tree is None:
-				print("Skipping unrecongized Object: #{0} class={1} data_offset={2}, size={3}".format(id, obj.class_id, obj.data_offset, obj.size))
+				if self.args.verbose:
+					print("Skipping unrecongized Object: #{0} class={1} data_offset={2}, size={3}".format(id, obj.class_id, obj.data_offset, obj.size))
 				continue
 
 			if obj.type not in art_dict:
@@ -215,7 +220,8 @@ class UnityAssetStats:
 
 			d = obj.read_name_only()
 			if d is None:
-				print("Did not read a name for Object {0} {1} {2}".format(id, obj.type))
+				if self.args.verbose:
+					print("Did not read a name for Object {0} {1} {2}".format(id, obj.type))
 				continue
 			name = d['m_Name']
 

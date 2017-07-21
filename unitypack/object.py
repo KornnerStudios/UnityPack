@@ -110,7 +110,7 @@ class ObjectInfo:
 			})
 			return dict
 		else:
-			print("%r: first_child isn't a string (%r) and so we can't try to read the m_Name" % (self, t))
+			#print("%r: first_child isn't a string (%r) and so we can't try to read the m_Name" % (self, t))
 			return None
 
 	def read_value(self, type, buf):
