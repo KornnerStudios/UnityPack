@@ -154,7 +154,7 @@ class Asset:
 			if obj.class_id in trees:
 				self.types[obj.type_id] = trees[obj.class_id]
 			else:
-				logging.warning("%r absent from structs.dat", obj.class_id)
+				#logging.warning("%r absent from structs.dat", obj.class_id)
 				self.types[obj.type_id] = None
 
 		if obj.path_id in self._objects:

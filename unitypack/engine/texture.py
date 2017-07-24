@@ -1,21 +1,44 @@
-from enum import IntEnum
+﻿from enum import IntEnum
 from .object import Object, field
 
 
 class TextureFormat(IntEnum):
+	Unknown = -1
+	NONE = 0
+
 	Alpha8 = 1
 	ARGB4444 = 2
 	RGB24 = 3
 	RGBA32 = 4
 	ARGB32 = 5
+	ARGBFloat = 6
 	RGB565 = 7
+	BGR24 = 8
+	AlphaLum16 = 9
 
 	# Direct3D
 	DXT1 = 10
+	DXT3 = 11
 	DXT5 = 12
 
 	RGBA4444 = 13
 	BGRA32 = 14
+
+	RHalf = 15
+	RGHalf = 16
+	RGBAHalf = 17
+	RFloat = 18
+	RGFloat = 19
+	RGBAFloat = 20
+
+	YUY2 = 21
+
+	RGBFloat = 23
+
+	BC6H = 24
+	BC7 = 25
+	BC4 = 26
+	BC5 = 27
 
 	DXT1Crunched = 28
 	DXT5Crunched = 29
@@ -59,6 +82,9 @@ class TextureFormat(IntEnum):
 	ASTC_RGBA_10x10 = 58
 	ASTC_RGBA_12x12 = 59
 
+	RGB4_3DS = 60
+	RGBA8_3DS = 61
+
 	@property
 	def pixel_format(self):
 		if self == TextureFormat.RGB24:
@@ -91,6 +117,33 @@ IMPLEMENTED_FORMATS = (
 )
 
 
+class TextureDimension(IntEnum):
+	Unknown = -1
+	NONE = 0
+	Any = 1
+	_2D = 2
+	_3D = 3
+	Cube = 4
+	_2DArray = 5
+	CubeArray = 6
+
+
+class TextureFilterMode(IntEnum):
+	Nearest = 0
+	Bilinear = 1
+	Trilinear = 2
+
+
+class TextureAnisotropyFactor(IntEnum):
+	AlwaysDisabled = 0
+	NONE = 1
+
+
+class TextureWrapMode(IntEnum):
+	Repeat = 0
+	Clamp = 1
+
+
 class Sprite(Object):
 	border = field("m_Border")
 	extrude = field("m_Extrude")
@@ -114,6 +167,13 @@ class Material(Object):
 		return {k: dict(_unpack_prop(v)) for k, v in self._obj["m_SavedProperties"].items()}
 
 
+class TextureSettings(Object):
+	m_FilterMode = field("m_FilterMode", TextureFilterMode)
+	m_Aniso = field("m_Aniso", TextureAnisotropyFactor)
+	m_MipBias = field("m_MipBias", float)
+	m_WrapMode = field("m_WrapMode", TextureWrapMode)
+
+
 class Texture(Object):
 	height = field("m_Height")
 	width = field("m_Width")
@@ -122,12 +182,12 @@ class Texture(Object):
 class Texture2D(Texture):
 	data = field("image data")
 	lightmap_format = field("m_LightmapFormat")
-	texture_settings = field("m_TextureSettings")
+	texture_settings = field("m_TextureSettings", TextureSettings)
 	color_space = field("m_ColorSpace")
 	is_readable = field("m_IsReadable")
 	read_allowed = field("m_ReadAllowed")
 	format = field("m_TextureFormat", TextureFormat)
-	texture_dimension = field("m_TextureDimension")
+	texture_dimension = field("m_TextureDimension", TextureDimension)
 	mipmap = field("m_MipMap")
 	complete_image_size = field("m_CompleteImageSize")
 	stream_data = field("m_StreamData", default=False)

@@ -19,6 +19,11 @@ class AssetBundle(Object):
 		return self.name
 
 	def to_json_data(self, asset_bundle_obj):
+		bundle = asset_bundle_obj.asset.bundle
+		block_storage_file_offset = 0
+		if bundle is not None:
+			block_storage_file_offset = bundle.block_storage_file_offset
+
 		this_json_data = ({
 			'name': self.name,
 			'AssetBundleName': self.m_AssetBundleName,
@@ -38,7 +43,7 @@ class AssetBundle(Object):
 					'UnityType': obj.type,
 					'Size': obj.size,
 					'OffsetInBlock': obj.data_offset,
-					'OffsetInFile': bundle.block_storage_file_offset + obj.data_offset,
+					'OffsetInFile': block_storage_file_offset + obj.data_offset,
 				})
 
 			if path in container_dict:

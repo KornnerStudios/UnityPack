@@ -27,7 +27,10 @@ class ObjectInfo:
 		if self.type_id > 0:
 			return UnityClass(self.type_id)
 		elif self.type_id not in self.asset.typenames:
-			script = self.read()["m_Script"]
+			_read_result = self.read()
+			if _read_result is None:
+				return None
+			script = _read_result["m_Script"]
 			if script:
 				try:
 					typename = script.resolve()["m_ClassName"]
@@ -114,6 +117,8 @@ class ObjectInfo:
 			return None
 
 	def read_value(self, type, buf):
+		if type is None:
+			return None
 		align = False
 		expected_size = type.size
 		pos_before = buf.tell()
@@ -210,6 +215,15 @@ class ObjectPointer:
 
 	def __bool__(self):
 		return not (self.file_id == 0 and self.path_id == 0)
+
+	@property
+	def asset_ref(self):
+		from .asset import AssetRef
+
+		ret = self.source_asset.asset_refs[self.file_id]
+		if isinstance(ret, AssetRef):
+			ret
+		return None
 
 	@property
 	def asset(self):

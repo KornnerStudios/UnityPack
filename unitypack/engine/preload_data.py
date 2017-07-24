@@ -25,7 +25,7 @@ class PreloadData(Object):
 
 			try:
 				obj = obj_ptr.object
-				value = value + ({
+				value.update({
 					'UnityType': obj.type,
 					'Size': obj.size,
 					'OffsetInBlock': obj.data_offset,
