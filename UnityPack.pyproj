@@ -45,6 +45,9 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="unitypack\engine\renderer.py" />
+    <Compile Include="unitypack\engine\shader.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="unitypack\engine\text.py" />
     <Compile Include="unitypack\engine\texture.py" />
     <Compile Include="unitypack\engine\__init__.py" />

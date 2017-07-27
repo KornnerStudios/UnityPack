@@ -20,21 +20,9 @@ class PreloadData(Object):
 		asset_list = []
 		for obj_ptr in self.m_Assets:
 			value = ({
+				'FileId': obj_ptr.file_id,
 				'PathId': obj_ptr.path_id,
 			})
-
-			try:
-				obj = obj_ptr.object
-				value.update({
-					'UnityType': obj.type,
-					'Size': obj.size,
-					'OffsetInBlock': obj.data_offset,
-					'OffsetInFile': block_storage_file_offset + obj.data_offset,
-				})
-			except KeyError:
-				value['UndefinedAsset'] = obj_ptr.asset_path
-			except NotImplementedError:
-				value['UnresolvedAsset'] = obj_ptr.asset_path
 
 			asset_list.append(value)
 

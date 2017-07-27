@@ -107,7 +107,7 @@ class AssetBundle:
 		num_blocks = blk.read_int()
 		blocks = []
 		for i in range(num_blocks):
-			busize, bcsize = blk.read_int(), blk.read_int()
+			busize, bcsize = blk.read_uint(), blk.read_uint()
 			bflags = blk.read_int16()
 			blocks.append(ArchiveBlockInfo(busize, bcsize, bflags))
 

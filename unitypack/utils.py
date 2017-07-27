@@ -1,5 +1,6 @@
-import struct
+﻿import struct
 from os import SEEK_CUR
+import ctypes
 
 
 def lz4_decompress(data, size):
@@ -87,25 +88,28 @@ class BinaryReader:
 		return bool(struct.unpack(self.endian + "b", self.read(1))[0])
 
 	def read_byte(self) -> int:
-		return struct.unpack(self.endian + "b", self.read(1))[0]
+		return ctypes.c_byte( struct.unpack(self.endian + "b", self.read(1))[0] ).value
 
 	def read_ubyte(self) -> int:
-		return struct.unpack(self.endian + "B", self.read(1))[0]
+		return ctypes.c_ubyte( struct.unpack(self.endian + "B", self.read(1))[0] ).value
 
 	def read_int16(self) -> int:
-		return struct.unpack(self.endian + "h", self.read(2))[0]
+		return ctypes.c_int16( struct.unpack(self.endian + "h", self.read(2))[0] ).value
 
 	def read_uint16(self) -> int:
-		return struct.unpack(self.endian + "H", self.read(2))[0]
+		return ctypes.c_uint16( struct.unpack(self.endian + "H", self.read(2))[0] ).value
 
 	def read_int(self) -> int:
-		return struct.unpack(self.endian + "i", self.read(4))[0]
+		return ctypes.c_int( struct.unpack(self.endian + "i", self.read(4))[0] ).value
 
 	def read_uint(self) -> int:
-		return struct.unpack(self.endian + "I", self.read(4))[0]
+		return ctypes.c_uint( struct.unpack(self.endian + "I", self.read(4))[0] ).value
 
 	def read_float(self) -> float:
 		return struct.unpack(self.endian + "f", self.read(4))[0]
 
 	def read_int64(self) -> int:
-		return struct.unpack(self.endian + "q", self.read(8))[0]
+		return ctypes.c_int64( struct.unpack(self.endian + "q", self.read(8))[0] ).value
+
+	def read_uint64(self) -> int:
+		return ctypes.c_uint64( struct.unpack(self.endian + "Q", self.read(8))[0] ).value

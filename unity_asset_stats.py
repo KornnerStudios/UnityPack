@@ -36,12 +36,20 @@ class UnityAssetStats:
 			p.add_argument("--" + arg, action="store_true", help="Extract %s" % (clsname))
 		p.add_argument("-o", "--outdir", nargs="?", default="", help="Output directory")
 		p.add_argument("--as-asset", action="store_true", help="Force open files as Asset format")
-		p.add_argument("--filter", nargs="*", help="Filter extraction for a specific name")
 		p.add_argument("-n", "--dry-run", action="store_true", help="Skip writing files")
-		p.add_argument("--art_dump", action="store_true", help="Dump info about art files (Textures, Meshes)")
-		p.add_argument("--art_dump_summary", action="store_true", help="Build a summary of from dumped art files info")
 		p.add_argument("--path_to_assets", nargs="?", default="", help="Directory containing .asset files to process")
 		p.add_argument("--path_to_asset_bundles", nargs="?", default="", help="Directory containing .manifest files for asset bundles to process")
+
+		p.add_argument("--sort_objects", action="store_true", help="")
+
+		p.add_argument("--art_dump", action="store_true", help="Dump info about art files (Textures, Meshes)")
+
+		p.add_argument("--art_dump_summary", action="store_true", help="Build a summary of from dumped art files info")
+		p.add_argument("--min_instances_count", type=int, nargs='?', default=-1,
+			help="When dumping a summary, marks the min InstancesCount for an asset to be listed for auto bundling scripts")
+		p.add_argument("--min_image_size", type=int, nargs='?', default=-1,
+			help="When dumping a summary, marks the min ImageSize for an asset to be listed for auto bundling scripts")
+
 		self.args = p.parse_args(args)
 
 		self.handle_formats = []
@@ -52,6 +60,7 @@ class UnityAssetStats:
 	def run(self):
 		files = self.args.files
 
+		self.populate_files_with_asset_levels(files)
 		self.populate_files_with_assets(files)
 		self.populate_files_with_asset_bundles(files)
 
@@ -63,6 +72,10 @@ class UnityAssetStats:
 		for file in files:
 			print("Processing " + file + "...", end='')
 
+			# reset the write_json_data flag during art_dump. It is flipped when there are art assets found
+			if self.args.art_dump:
+				self.write_json_data = False
+
 			if self.args.art_dump_summary:
 				with open(file, "r") as f:
 					self.handle_file_for_art_dump_summary(file, f)
@@ -71,8 +84,9 @@ class UnityAssetStats:
 
 			# reset the json_data dict working memory on each file
 			self.json_data = {}
+			self.write_json_data = True
 
-			if self.args.as_asset or file.endswith(".assets"):
+			if self.args.as_asset or file.endswith(".assets") or file.find("\\level") >= 0:
 				with open(file, "rb") as f:
 					asset = Asset.from_file(f)
 
@@ -89,8 +103,11 @@ class UnityAssetStats:
 
 					if not self.args.dry_run:
 						json_path = file + ".json"
-						with open(json_path, "w") as json_file:
-							json_file.write(json.dumps(self.json_data, indent=4))
+						if self.write_json_data:
+							with open(json_path, "w") as json_file:
+								json_file.write(json.dumps(self.json_data, indent=4))
+						else:
+							print("Not writing JSON...", end='')
 
 				print("Done")
 				continue
@@ -116,8 +133,11 @@ class UnityAssetStats:
 
 				if not self.args.dry_run:
 					json_path = file + ".json"
-					with open(json_path, "w") as json_file:
-						json_file.write(json.dumps(self.json_data, indent=4))
+					if self.write_json_data:
+						with open(json_path, "w") as json_file:
+							json_file.write(json.dumps(self.json_data, indent=4))
+					else:
+						print("Not writing JSON...", end='')
 
 			print("Done")
 
@@ -128,7 +148,29 @@ class UnityAssetStats:
 
 		return 0
 
+	def populate_files_with_asset_levels(self, files):
+		if len(self.args.path_to_assets) == 0:
+			return
+
+		file_ex = ''
+		if self.args.art_dump_summary:
+			file_ex = '.json'
+
+		for f in os.listdir(self.args.path_to_assets):
+			if f.startswith("level"):
+				if not self.args.art_dump_summary and f.endswith('.json'):
+					continue
+				files.append(os.path.join(self.args.path_to_assets, f))
+
+		#for file in [f for f in os.listdir(self.args.path_to_assets) if f.startswith("level")]:
+		#	if not self.args.art_dump_summary and f.endswith('.json'):
+		#		continue
+		#	files.append(os.path.join(self.args.path_to_assets, file))
+
 	def populate_files_with_assets(self, files):
+		if len(self.args.path_to_assets) == 0:
+			return
+
 		file_ex = '.assets'
 		if self.args.art_dump_summary:
 			file_ex = '.json'
@@ -137,6 +179,9 @@ class UnityAssetStats:
 			files.append(os.path.join(self.args.path_to_assets, file))
 
 	def populate_files_with_asset_bundles(self, files):
+		if len(self.args.path_to_asset_bundles) == 0:
+			return
+
 		file_ex = '.manifest'
 		if self.args.art_dump_summary:
 			file_ex = '.json'
@@ -177,7 +222,12 @@ class UnityAssetStats:
 		return
 
 	def handle_asset(self, asset_file_path, asset):
-		objects_json = {}
+		objects_json = []
+
+		bundle = asset.bundle
+		block_storage_file_offset = 0
+		if bundle is not None:
+			block_storage_file_offset = bundle.block_storage_file_offset
 
 		for id, obj in asset.objects.items():
 			if obj.type_tree is None:
@@ -187,12 +237,20 @@ class UnityAssetStats:
 
 			obj_json = None
 
+			if obj.type == "Shader" and id != 2841:
+				d = obj.read()
+				d = d
+
 			if obj.type == "AssetBundle":
 				d = obj.read()
 				obj_json = d.to_json_data(obj)
+				self.json_data[obj.type] = obj_json
+				continue
 			elif obj.type == "PreloadData":
 				d = obj.read()
 				obj_json = d.to_json_data(obj)
+				self.json_data[obj.type] = obj_json
+				continue
 			else:
 				#d = obj.read()
 				d = obj.read_name_only()
@@ -203,14 +261,16 @@ class UnityAssetStats:
 					name = d.name
 				else:
 					name = d['m_Name']
+
 				obj_json = ({
 					'PathId': obj.path_id,
 					'name': name,
 					'UnityType': obj.type,
 					'Size': obj.size,
-					'OffsetInBlock': obj.data_offset,
+					#'OffsetInBlock': obj.data_offset,
+					'OffsetInFile': block_storage_file_offset + obj.data_offset,
 				})
-				objects_json[id] = obj_json
+				objects_json.append(obj_json)
 				continue
 
 			if obj_json is not None:
@@ -219,7 +279,9 @@ class UnityAssetStats:
 					key = obj.name
 				self.json_data[key] = obj_json
 
-		self.json_data['Objects'] = objects_json
+		if self.args.sort_objects:
+			objects_json.sort(key=lambda x: x['Size'], reverse=True)
+		self.json_data[asset.name + '.Objects'] = objects_json
 
 	def handle_asset_for_art_dump(self, asset_file_path, asset):
 
@@ -312,6 +374,8 @@ class UnityAssetStats:
 				continue
 			objects_list = value['Objects']
 			objects_list.sort(key=lambda x: x['Size'], reverse=True)
+			if not self.write_json_data:
+				self.write_json_data = len(objects_list) > 0
 
 		art_dump = self.json_data['ArtDump']
 		art_dump[asset.name] = art_dict
@@ -366,24 +430,55 @@ class UnityAssetStats:
 			art_obj_summary_instances_count += 1
 			art_obj_summary['InstancesCount'] = art_obj_summary_instances_count
 
-
 	def write_art_dump_summary(self):
 		summary_path = self.get_output_path("art_dump_summary" + ".json")
 
 		art_dump_textures_list = list(self.art_dump_textures_summary.values())
-		art_dump_textures_list.sort(key=lambda x: x['ImageSize'], reverse=True)
+		art_dump_textures_list.sort(key=lambda x: (x['InstancesCount'], x['ImageSize']), reverse=True)
 
 		art_dump_meshes_list = list(self.art_dump_meshes_summary.values())
-		art_dump_meshes_list.sort(key=lambda x: x['Size'], reverse=True)
+		art_dump_meshes_list.sort(key=lambda x: (x['InstancesCount'], x['Size']), reverse=True)
 
 		self.art_dump_summary = ({
 			'DumpFiles': self.args.files,
 			'Texture2D': art_dump_textures_list,
 			'Mesh': art_dump_meshes_list,
+			'AutoBundleScriptInputs': (
+				self.generate_art_dump_summary_auto_bundle_script_inputs(art_dump_textures_list, "Texture2D") +
+				self.generate_art_dump_summary_auto_bundle_script_inputs(art_dump_meshes_list, "Mesh")
+			),
 		})
 
 		with open(summary_path, "w") as json_file:
 			json_file.write(json.dumps(self.art_dump_summary, indent=4))
+
+	def generate_art_dump_summary_auto_bundle_script_inputs(self, asset_list: list, asset_type: str) -> list:
+		if asset_type != "Texture2D":
+			return []
+
+		if self.args.min_instances_count < 0 and self.args.min_image_size:
+			return []
+
+		script_inputs = []
+
+		for asset in asset_list:
+			name, instances_count, image_size = asset['Name'], asset['InstancesCount'], asset['ImageSize']
+			if self.args.min_instances_count < 0 or self.args.min_instances_count > instances_count:
+				continue
+			if self.args.min_image_size < 0 or self.args.min_image_size > image_size:
+				continue
+
+			name_dot_index = name.rfind('.')
+			if name_dot_index == -1:
+				print("BAD NAME! NO '.': %r" % name)
+				continue
+
+			name = name[:name_dot_index]
+
+			input = "{0} t:{1}".format(name, asset_type)
+			script_inputs.append(input)
+
+		return script_inputs
 
 
 

@@ -1,4 +1,4 @@
-def field(f, cast=None, **kwargs):
+﻿def field(f, cast=None, **kwargs):
 	def _inner(self):
 		if "default" in kwargs:
 			ret = self._obj.get(f, kwargs["default"])
@@ -6,6 +6,20 @@ def field(f, cast=None, **kwargs):
 			ret = self._obj[f]
 		if cast:
 			ret = cast(ret)
+		return ret
+	return property(_inner)
+
+def field_list(f, cast=None, **kwargs):
+	def _inner(self):
+		if "default" in kwargs:
+			ret = self._obj.get(f, kwargs["default"])
+		else:
+			ret = self._obj[f]
+		if cast:
+			list = []
+			for x in ret:
+				list.append(cast(x))
+			ret = list
 		return ret
 	return property(_inner)
 
