@@ -529,7 +529,7 @@ class UnityAssetStats:
 		art_dump_animation_clips_list = list(self.art_dump_animation_clips_summary.values())
 		art_dump_animation_clips_list.sort(key=lambda x: (x['InstancesCount'], x['Size']), reverse=True)
 
-		art_dump_shaders_list = list(self.art_dump_animation_clips_summary.values())
+		art_dump_shaders_list = list(self.art_dump_shaders_summary.values())
 		art_dump_shaders_list.sort(key=lambda x: (x['InstancesCount'], x['Size']), reverse=True)
 
 		self.art_dump_summary = ({
