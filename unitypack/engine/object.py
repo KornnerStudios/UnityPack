@@ -23,6 +23,24 @@ def field_list(f, cast=None, **kwargs):
 		return ret
 	return property(_inner)
 
+def field_dict(f, cast_key=None, cast_value=None, **kwargs):
+	def _inner(self):
+		if "default" in kwargs:
+			ret = self._obj.get(f, kwargs["default"])
+		else:
+			ret = self._obj[f]
+		if cast_key and cast_value:
+			dict = {}
+			for x in ret:
+				k = x[0]
+				v = x[1]
+				key = cast_key(k)
+				value = cast_value(v)
+				dict[key] = value
+			ret = dict
+		return ret
+	return property(_inner)
+
 
 class Object:
 	def __init__(self, data=None):
