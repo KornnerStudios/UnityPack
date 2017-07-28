@@ -15,6 +15,7 @@ class AssetBundle:
 	def __init__(self, environment):
 		self.environment = environment
 		self.assets = []
+		self._all_assets = []
 		self.block_storage_file_offset = -1
 		self.compression_type = CompressionType.NONE
 
@@ -128,7 +129,9 @@ class AssetBundle:
 			asset.name = name
 			asset.block_storage_offset = ofs
 			asset.block_storage_size = size
-			self.assets.append(asset)
+			self._all_assets.append(asset)
+			if not name.startswith("GI/"):
+				self.assets.append(asset)
 
 		# Hacky
 		self.name = self.assets[0].name
