@@ -51,4 +51,46 @@ class RuntimePlatform(IntEnum):
 	WiiU = 30
 	tvOS = 31
 	Switch = 32
-	Unknown33 = 33
+
+class BuildTargetPlatform(IntEnum):
+	NoTargetPlatform = -2
+	AnyPlayerData = -1
+	ValidPlayer = 1
+	#0
+	StandaloneOSXUniversal = 2
+	StandaloneOSXPPC = 3
+	StandaloneOSXIntel = 4
+	StandaloneWinPlayer = 5
+	WebPlayerLZMA = 6
+	WebPlayerLZMAStreamed = 7
+	#8
+	iPhone = 9
+	DeprecatedPS3 = 10
+	Xbox360 = 11
+	Broadcom = 12
+	Android = 13
+	WinGLESEmu = 14
+	WinGLES20Emu = 15
+	NaCl = 16
+	StandaloneLinux = 17
+	Flash = 18
+	StandaloneWin64Player = 19
+	WebGL = 20
+	MetroPlayer = 21
+	#22
+	#23
+	StandaloneLinux64 = 24
+	StandaloneLinuxUniversal = 25
+	DeprecatedWP8Player = 26
+	StandaloneOSXIntel64 = 27
+	DeprecatedBB10 = 28
+	Tizen = 29
+	PSP2 = 30
+	PS4 = 31
+	PSM = 32
+	XboxOne = 33
+	SamsungTV = 34
+	N3DS = 35
+	WiiU = 36
+	tvOS = 37
+	Switch = 38

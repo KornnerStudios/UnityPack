@@ -1,6 +1,7 @@
 ﻿from enum import IntEnum
 from .component import Component
-from .object import Object, field
+from .object import Object, field, field_list, field_dict
+#from unitypack.object import ObjectPointer
 import json
 
 class AssetInfo(Object):
@@ -9,9 +10,9 @@ class AssetInfo(Object):
 	asset = field("asset")
 
 class AssetBundle(Object):
-	m_PreloadTable = field("m_PreloadTable")
-	m_Container = field("m_Container", dict)
-	m_MainAsset = field("m_MainAsset")
+	m_PreloadTable = field_list("m_PreloadTable")
+	m_Container = field_dict("m_Container", str, AssetInfo)
+	m_MainAsset = field("m_MainAsset", AssetInfo)
 	m_AssetBundleName = field("m_AssetBundleName")
 	m_Dependencies = field("m_Dependencies")
 
@@ -32,7 +33,7 @@ class AssetBundle(Object):
 
 		container_dict = {}
 		for path, asset_info in self.m_Container.items():
-			obj_ptr = asset_info['asset']
+			obj_ptr = asset_info.asset
 			if obj_ptr is None:
 				print("No 'asset' value for {0}".format(path))
 				continue;

@@ -31,6 +31,9 @@
     <Compile Include="setup.py" />
     <Compile Include="unitypack\asset.py" />
     <Compile Include="unitypack\assetbundle.py" />
+    <Compile Include="unitypack\asset_dependencies.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="unitypack\engine\animation.py" />
     <Compile Include="unitypack\engine\asset_bundle.py" />
     <Compile Include="unitypack\engine\audio.py" />

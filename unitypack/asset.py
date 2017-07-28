@@ -86,6 +86,12 @@ class Asset:
 		return self._objects
 
 	@property
+	def external_refs(self):
+		if not self.loaded:
+			self.load()
+		return self.asset_refs
+
+	@property
 	def is_resource(self):
 		return self.name.endswith(".resource")
 
@@ -169,6 +175,19 @@ class Asset:
 			for child in tree.children:
 				ret.append("\t" + repr(child))
 		return "\n".join(ret)
+
+	def external_refs_to_file_path_list(self):
+		list = []
+
+		for ref in self.external_refs:
+			# asset_refs is initialized to a list that includes self, due to how file_id resolution works at runtime
+			if ref == self:
+				list.append(self.name)
+				continue
+
+			list.append(ref.file_path)
+
+		return list
 
 
 class AssetRef:

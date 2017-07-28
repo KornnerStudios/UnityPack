@@ -8,6 +8,7 @@ from io import BytesIO
 from unitypack.asset import Asset
 from unitypack.export import OBJMesh
 from unitypack.utils import extract_audioclip_samples
+from unitypack.asset_dependencies import AssetDependencyDatabase
 import json
 
 class UnityAssetStats:
@@ -22,10 +23,22 @@ class UnityAssetStats:
 		"asset_bundles": "AssetBundle",
 		"preload_data": "PreloadData",
 	}
+	BUILT_IN_ASSETS = [
+		"unity default resources",
+		"unity_builtin_extra"
+	]
+	def find_built_in_assets_index(self, filename) -> int:
+		index = 0
+		for built_in_name in self.BUILT_IN_ASSETS:
+			if filename.find(built_in_name) >= 0:
+				return index
+			index += 1
+		return -1
 
 	def __init__(self, args):
 		self.parse_args(args)
 		self.json_data = {}
+		self.dependency_db = None
 
 	def parse_args(self, args):
 		p = ArgumentParser()
@@ -37,10 +50,13 @@ class UnityAssetStats:
 		p.add_argument("-o", "--outdir", nargs="?", default="", help="Output directory")
 		p.add_argument("--as-asset", action="store_true", help="Force open files as Asset format")
 		p.add_argument("-n", "--dry-run", action="store_true", help="Skip writing files")
+		p.add_argument("--path_to_resources", nargs="?", default="", help="Should be the Resource subfolder of path_to_assets")
 		p.add_argument("--path_to_assets", nargs="?", default="", help="Directory containing .asset files to process")
 		p.add_argument("--path_to_asset_bundles", nargs="?", default="", help="Directory containing .manifest files for asset bundles to process")
 
 		p.add_argument("--sort_objects", action="store_true", help="")
+
+		p.add_argument("--dep_summary", action="store_true", help="")
 
 		p.add_argument("--art_dump", action="store_true", help="Dump info about art files (Textures, Meshes)")
 
@@ -60,6 +76,7 @@ class UnityAssetStats:
 	def run(self):
 		files = self.args.files
 
+		self.populate_files_with_resource_assets(files)
 		self.populate_files_with_asset_levels(files)
 		self.populate_files_with_assets(files)
 		self.populate_files_with_asset_bundles(files)
@@ -68,9 +85,20 @@ class UnityAssetStats:
 		if self.args.art_dump_summary:
 			self.art_dump_textures_summary = {}
 			self.art_dump_meshes_summary = {}
+			self.art_dump_animation_clips_summary = {}
+			self.art_dump_shaders_summary = {}
+			self.art_dump_textures_size = 0
+			self.art_dump_meshes_size = 0
+			self.art_dump_animation_clips_size = 0
+			self.art_dump_shaders_size = 0
+		elif self.args.dep_summary:
+			self.dependency_db = AssetDependencyDatabase()
 
 		for file in files:
-			print("Processing " + file + "...", end='')
+			if self.args.dep_summary:
+				print("Processing " + file + "...", flush=True)
+			else:
+				print("Processing " + file + "...", end='', flush=True)
 
 			# reset the write_json_data flag during art_dump. It is flipped when there are art assets found
 			if self.args.art_dump:
@@ -86,7 +114,7 @@ class UnityAssetStats:
 			self.json_data = {}
 			self.write_json_data = True
 
-			if self.args.as_asset or file.endswith(".assets") or file.find("\\level") >= 0:
+			if self.args.as_asset or file.endswith(".assets") or file.find("\\level") >= 0 or self.find_built_in_assets_index(file) >= 0:
 				with open(file, "rb") as f:
 					asset = Asset.from_file(f)
 
@@ -95,6 +123,9 @@ class UnityAssetStats:
 					# setup the ArtDump dictionary for handle_asset_for_art_dump
 					if self.args.art_dump:
 						self.json_data['ArtDump'] = {}
+					elif self.args.dep_summary:
+						self.dependency_db.add_asset(file, asset)
+						continue
 
 					if self.args.art_dump:
 						self.handle_asset_for_art_dump(file, asset)
@@ -124,6 +155,9 @@ class UnityAssetStats:
 				# setup the ArtDump dictionary for handle_asset_for_art_dump
 				if self.args.art_dump:
 					self.json_data['ArtDump'] = {}
+				elif self.args.dep_summary:
+					self.dependency_db.build_from_bundle(file, bundle)
+					continue
 
 				for asset in bundle.assets:
 					if self.args.art_dump:
@@ -145,6 +179,12 @@ class UnityAssetStats:
 			print("Writing art dump summary " + "" + "...", end='')
 			self.write_art_dump_summary()
 			print("Done")
+		elif self.args.dep_summary:
+			if self.dependency_db is not None:
+				summary_path = self.get_output_path("dependency_summary" + ".json")
+				print("Writing dependency summary " + "" + "...", end='', flush=True)
+				self.dependency_db.write_to_json_file(summary_path)
+				print("Done")
 
 		return 0
 
@@ -159,6 +199,8 @@ class UnityAssetStats:
 		for f in os.listdir(self.args.path_to_assets):
 			if f.startswith("level"):
 				if not self.args.art_dump_summary and f.endswith('.json'):
+					continue
+				if self.args.art_dump_summary and not f.endswith('.json'):
 					continue
 				files.append(os.path.join(self.args.path_to_assets, f))
 
@@ -178,6 +220,20 @@ class UnityAssetStats:
 		for file in [f for f in os.listdir(self.args.path_to_assets) if f.endswith(file_ex)]:
 			files.append(os.path.join(self.args.path_to_assets, file))
 
+	def populate_files_with_resource_assets(self, files):
+		if self.args.art_dump_summary:
+			return
+		if len(self.args.path_to_resources) == 0:
+			return
+
+		file_ex = "NO_FILE_EX"
+		if not self.args.art_dump_summary:
+			file_ex = '.json'
+
+		for f in os.listdir(self.args.path_to_resources):
+			if not f.endswith(file_ex) and self.find_built_in_assets_index(f) >= 0:
+				files.append(os.path.join(self.args.path_to_resources, f))
+
 	def populate_files_with_asset_bundles(self, files):
 		if len(self.args.path_to_asset_bundles) == 0:
 			return
@@ -186,7 +242,7 @@ class UnityAssetStats:
 		if self.args.art_dump_summary:
 			file_ex = '.json'
 
-		for file in [f for f in os.listdir(self.args.path_to_asset_bundles) if f.endswith(file_ex)]:
+		for file in [f for f in os.listdir(self.args.path_to_asset_bundles) if f.endswith(file_ex) and not f.startswith("mega_textures")]:
 			file = os.path.join(self.args.path_to_asset_bundles, file)
 			file = file.replace(".manifest", "")
 			files.append(file)
@@ -223,6 +279,11 @@ class UnityAssetStats:
 
 	def handle_asset(self, asset_file_path, asset):
 		objects_json = []
+		asset_json = ({
+			'Name': asset.name,
+			'ExternalRefs': asset.external_refs_to_file_path_list(),
+		})
+		self.json_data[asset.name] = asset_json
 
 		bundle = asset.bundle
 		block_storage_file_offset = 0
@@ -244,12 +305,12 @@ class UnityAssetStats:
 			if obj.type == "AssetBundle":
 				d = obj.read()
 				obj_json = d.to_json_data(obj)
-				self.json_data[obj.type] = obj_json
+				asset_json[obj.type] = obj_json
 				continue
 			elif obj.type == "PreloadData":
 				d = obj.read()
 				obj_json = d.to_json_data(obj)
-				self.json_data[obj.type] = obj_json
+				asset_json[obj.type] = obj_json
 				continue
 			else:
 				#d = obj.read()
@@ -277,23 +338,36 @@ class UnityAssetStats:
 				key = obj.type
 				if hasattr(obj, 'name'):
 					key = obj.name
-				self.json_data[key] = obj_json
+				asset_json[key] = obj_json
 
 		if self.args.sort_objects:
 			objects_json.sort(key=lambda x: x['Size'], reverse=True)
-		self.json_data[asset.name + '.Objects'] = objects_json
+
+		asset_json['Objects'] = objects_json
 
 	def handle_asset_for_art_dump(self, asset_file_path, asset):
 
 		art_dict = ({
 			'Texture2D': ({
 				'TotalSize': 0,
+				'TotalRealSize': 0,
 				'Objects': [],
 			}),
 			'Mesh': ({
 				'TotalSize': 0,
+				'TotalRealSize': 0,
 				'Objects': [],
-			})
+			}),
+			'AnimationClip': ({
+				'TotalSize': 0,
+				'TotalRealSize': 0,
+				'Objects': [],
+			}),
+			'Shader': ({
+				'TotalSize': 0,
+				'TotalRealSize': 0,
+				'Objects': [],
+			}),
 		})
 		desired_art_types = list(art_dict.keys())
 
@@ -345,6 +419,7 @@ class UnityAssetStats:
 			objects_list = object_dict['Objects']
 
 			obj_size = obj.size
+			obj_real_size = obj_size
 
 			# update Objects
 			object_info = ({
@@ -361,6 +436,9 @@ class UnityAssetStats:
 					object_info['IsReadable'] = True
 				# texture data in .assets may exist outside the file, and so the the obj.size doesn't represent the number we desire in our TotalSize
 				if obj_size < d.complete_image_size:
+					# texture exists elsewhere
+					if asset.bundle is not None:
+						continue
 					obj_size = d.complete_image_size
 
 			objects_list.append(object_info)
@@ -368,6 +446,10 @@ class UnityAssetStats:
 			objects_total_size = object_dict['TotalSize']
 			objects_total_size += obj_size
 			object_dict['TotalSize'] = objects_total_size
+
+			objects_total_real_size = object_dict['TotalRealSize']
+			objects_total_real_size += obj_real_size
+			object_dict['TotalRealSize'] = objects_total_real_size
 
 		for key, value in art_dict.items():
 			if 'Objects' not in value:
@@ -389,8 +471,10 @@ class UnityAssetStats:
 			source_name = unity_file_name
 			if source_name.startswith("CAB-"):
 				source_name = source_file
-			self.handle_art_data_for_art_dump_summary(source_name, json_art_data, 'Texture2D', self.art_dump_textures_summary)
-			self.handle_art_data_for_art_dump_summary(source_name, json_art_data, 'Mesh', self.art_dump_meshes_summary)
+			self.art_dump_textures_size += self.handle_art_data_for_art_dump_summary(source_name, json_art_data, 'Texture2D', self.art_dump_textures_summary)
+			self.art_dump_meshes_size += self.handle_art_data_for_art_dump_summary(source_name, json_art_data, 'Mesh', self.art_dump_meshes_summary)
+			self.art_dump_animation_clips_size += self.handle_art_data_for_art_dump_summary(source_name, json_art_data, 'AnimationClip', self.art_dump_animation_clips_summary)
+			self.art_dump_shaders_size += self.handle_art_data_for_art_dump_summary(source_name, json_art_data, 'Shader', self.art_dump_shaders_summary)
 
 	def handle_art_data_for_art_dump_summary(self, unity_file_name, json_art_data, art_key, art_key_summary):
 		if art_key not in json_art_data:
@@ -398,6 +482,7 @@ class UnityAssetStats:
 
 		json_art_key_data = json_art_data[art_key]
 		json_art_objects = json_art_key_data['Objects']
+		json_art_total_size = json_art_key_data['TotalRealSize']
 
 		for art_obj in json_art_objects:
 			art_obj_name = art_obj['Name']
@@ -408,8 +493,6 @@ class UnityAssetStats:
 				art_key_summary[art_obj_name] = ({
 					'Name': art_obj_name,
 					'Size': art_obj_size,
-					'InstancesCount': 0,
-					'Instances': []
 				})
 				art_obj_summary = art_key_summary[art_obj_name]
 				if art_key == "Texture2D":
@@ -420,6 +503,8 @@ class UnityAssetStats:
 					art_obj_summary['Dimension'] = art_obj['Dimension']
 					if 'IsReadable' in art_obj:
 						art_obj_summary['IsReadable'] = art_obj['IsReadable']
+				art_obj_summary['InstancesCount'] = 0
+				art_obj_summary['Instances'] = []
 			else:
 				art_obj_summary = art_key_summary[art_obj_name]
 
@@ -430,6 +515,8 @@ class UnityAssetStats:
 			art_obj_summary_instances_count += 1
 			art_obj_summary['InstancesCount'] = art_obj_summary_instances_count
 
+		return json_art_total_size
+
 	def write_art_dump_summary(self):
 		summary_path = self.get_output_path("art_dump_summary" + ".json")
 
@@ -439,10 +526,22 @@ class UnityAssetStats:
 		art_dump_meshes_list = list(self.art_dump_meshes_summary.values())
 		art_dump_meshes_list.sort(key=lambda x: (x['InstancesCount'], x['Size']), reverse=True)
 
+		art_dump_animation_clips_list = list(self.art_dump_animation_clips_summary.values())
+		art_dump_animation_clips_list.sort(key=lambda x: (x['InstancesCount'], x['Size']), reverse=True)
+
+		art_dump_shaders_list = list(self.art_dump_animation_clips_summary.values())
+		art_dump_shaders_list.sort(key=lambda x: (x['InstancesCount'], x['Size']), reverse=True)
+
 		self.art_dump_summary = ({
 			'DumpFiles': self.args.files,
+			'SizeOfTexture2D': self.art_dump_textures_size,
+			'SizeOfMesh': self.art_dump_meshes_size,
+			'SizeOfAnimationClip': self.art_dump_animation_clips_size,
+			'SizeOfShader': self.art_dump_shaders_size,
 			'Texture2D': art_dump_textures_list,
 			'Mesh': art_dump_meshes_list,
+			'AnimationClip': art_dump_animation_clips_list,
+			'Shader': art_dump_shaders_list,
 			'AutoBundleScriptInputs': (
 				self.generate_art_dump_summary_auto_bundle_script_inputs(art_dump_textures_list, "Texture2D") +
 				self.generate_art_dump_summary_auto_bundle_script_inputs(art_dump_meshes_list, "Mesh")

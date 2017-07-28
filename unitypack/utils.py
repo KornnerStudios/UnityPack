@@ -1,6 +1,9 @@
 ﻿import struct
+import sys
 from os import SEEK_CUR
 import ctypes
+import datetime
+import enum
 
 
 def lz4_decompress(data, size):
@@ -11,6 +14,51 @@ def lz4_decompress(data, size):
 
 	return decompress(data, size)
 
+
+def json_default(o):
+    if isinstance(o, set):
+        return list(o)
+    return o.__dict__
+
+def to_serializable(val):
+    if isinstance(val, datetime.datetime):
+        return val.isoformat() + "Z"
+    elif isinstance(val, enum.Enum):
+        return val.value
+    elif attr.has(val.__class__):
+        return attr.asdict(val)
+    elif isinstance(val, Exception):
+        return {
+            "error": val.__class__.__name__,
+            "args": val.args,
+        }
+    return str(val)
+
+# Print iterations progress
+# https://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console
+def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█'):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+    """
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = '\r')
+    # Print New Line on Complete
+    if iteration == total:
+        prefix = ' ' * len(prefix)
+        bar = ' ' * length
+        percent = ' ' * len(percent)
+        suffix = ' ' * len(suffix)
+        print('\r%s  %s  %s  %s' % (prefix, bar, percent, suffix), end = '\r')
 
 def extract_audioclip_samples(d) -> dict:
 	"""

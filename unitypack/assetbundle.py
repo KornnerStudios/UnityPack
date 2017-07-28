@@ -193,6 +193,7 @@ class ArchiveBlockStorage:
 		self.sought = False
 		self.current_block = None
 		self.current_block_start = 0
+		self.current_block_index = -1
 		self.current_stream = None
 		self._seek(0)
 
@@ -239,16 +240,30 @@ class ArchiveBlockStorage:
 	def seek_to_block(self, pos):
 		baseofs = 0
 		ofs = 0
+		desired_block = None
+		desired_block_index = 0
 		for b in self.blocks:
 			if ofs + b.uncompressed_size > pos:
-				self.current_block = b
+				desired_block = b
 				break
 			baseofs += b.compressed_size
 			ofs += b.uncompressed_size
+			desired_block_index += 1
 		else:
 			self.current_block = None
 			self.current_stream = BytesIO(b"")
 			return
+
+		if self.current_block is None:
+			self.current_block = desired_block
+			self.current_block_index = desired_block_index
+		# don't re-decompress if we're in the same block
+		elif self.current_block_index == desired_block_index:
+			self.current_stream.seek(0)
+			return
+		else:
+			self.current_block = desired_block
+			self.current_block_index = desired_block_index
 
 		self.current_block_start = ofs
 		self.stream.seek(self.basepos + baseofs)
