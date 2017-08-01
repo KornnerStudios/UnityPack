@@ -1,7 +1,24 @@
-﻿from io import BytesIO
+﻿from enum import IntEnum
+from io import BytesIO
 from .enums import BuildTargetPlatform
 from .resources import get_resource, STRINGS_DAT
 from .utils import BinaryReader
+
+class TypeTreeHint(IntEnum):
+	NULL = 0
+	Bool = 1
+	Char = 2
+	SInt8 = 3
+	UInt8 = 4
+	SInt16 = 5
+	UInt16 = 6
+	SInt32 = 7
+	UInt32 = 8
+	SInt64 = 9
+	UInt64 = 10
+	Float = 11
+	String = 12
+	Other = 13
 
 
 class TypeTree:
@@ -15,6 +32,7 @@ class TypeTree:
 		self.index = 0
 		self.flags = 0
 		self.type = self.NULL
+		self.type_hint = TypeTreeHint.NULL
 		self.name = self.NULL
 		self.format = format
 
@@ -78,6 +96,7 @@ class TypeTree:
 			curr.size = buf.read_int()
 			curr.index = buf.read_uint()
 			curr.flags = buf.read_int()
+			curr.type_hint = self.get_type_hint_index(curr.type)
 
 	def get_string(self, offset):
 		if offset < 0:
@@ -88,6 +107,36 @@ class TypeTree:
 		else:
 			return self.NULL
 		return data[offset:].partition(b"\0")[0].decode("utf-8")
+
+	def get_type_hint_index(self, t: str) -> TypeTreeHint:
+		if t == "bool":
+			return TypeTreeHint.Bool
+		elif t == "char":
+			return TypeTreeHint.Char
+		elif t == "SInt8":
+			return TypeTreeHint.SInt8
+		elif t == "UInt8":
+			return TypeTreeHint.UInt8
+		elif t == "SInt16":
+			return TypeTreeHint.SInt16
+		elif t == "UInt16":
+			return TypeTreeHint.UInt16
+		elif t == "SInt64":
+			return TypeTreeHint.SInt64
+		elif t == "UInt64":
+			return TypeTreeHint.UInt64
+		elif t in ("UInt32", "unsigned int"):
+			return TypeTreeHint.UInt32
+		elif t in ("SInt32", "int"):
+			return TypeTreeHint.SInt32
+		elif t == "float":
+			return TypeTreeHint.Float
+		elif t == "string":
+			return TypeTreeHint.String
+		elif t == self.NULL:
+			return TypeTreeHint.NULL
+		else:
+			return TypeTreeHint.Other
 
 
 class TypeMetadata:

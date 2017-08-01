@@ -242,7 +242,7 @@ class UnityAssetStats:
 		if self.args.art_dump_summary:
 			file_ex = '.json'
 
-		for file in [f for f in os.listdir(self.args.path_to_asset_bundles) if f.endswith(file_ex) and not f.startswith("mega_textures")]:
+		for file in [f for f in os.listdir(self.args.path_to_asset_bundles) if f.endswith(file_ex)]:
 			file = os.path.join(self.args.path_to_asset_bundles, file)
 			file = file.replace(".manifest", "")
 			files.append(file)

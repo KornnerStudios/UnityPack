@@ -3,7 +3,7 @@ from collections import OrderedDict
 from io import BytesIO
 from . import engine as UnityEngine
 from .resources import UnityClass
-from .type import TypeMetadata, TypeTree
+from .type import TypeMetadata, TypeTree, TypeTreeHint
 from .utils import BinaryReader
 
 
@@ -123,30 +123,35 @@ class ObjectInfo:
 		expected_size = type.size
 		pos_before = buf.tell()
 		t = type.type
+		th = type.type_hint
 		first_child = type.children[0] if type.children else TypeTree(self.asset.format)
-		if t == "bool":
+		if th == TypeTreeHint.Bool:
 			result = buf.read_boolean()
-		elif t == "SInt8":
+		elif th == TypeTreeHint.SInt8:
 			result = buf.read_byte()
-		elif t == "UInt8":
+		elif th == TypeTreeHint.UInt8:
 			result = buf.read_ubyte()
-		elif t == "SInt16":
+		elif th == TypeTreeHint.SInt16:
 			result = buf.read_int16()
-		elif t == "UInt16":
+		elif th == TypeTreeHint.UInt16:
 			result = buf.read_uint16()
-		elif t == "SInt64":
+		elif th == TypeTreeHint.SInt64:
 			result = buf.read_int64()
-		elif t == "UInt64":
-			result = buf.read_int64()
-		elif t in ("UInt32", "unsigned int"):
+		elif th == TypeTreeHint.UInt64:
+			result = buf.read_uint64()
+		elif th == TypeTreeHint.UInt32:
 			result = buf.read_uint()
-		elif t in ("SInt32", "int"):
+		elif th == TypeTreeHint.SInt32:
 			result = buf.read_int()
-		elif t == "float":
+		elif th == TypeTreeHint.Float:
 			buf.align()
 			result = buf.read_float()
-		elif t == "string":
+		elif th == TypeTreeHint.String:
 			size = buf.read_uint()
+			#if size > buf.buf.getbuffer().nbytes:
+			#	raise ValueError("string size {0} is larger than buffer size {1}".format(size, buf.buf.getbuffer().nbytes))
+			#if size == 2910172598:
+			#	size = size
 			result = buf.read_string(size)
 			align = type.children[0].post_align
 		else:
@@ -163,7 +168,7 @@ class ObjectInfo:
 				align = first_child.post_align
 				size = buf.read_uint()
 				array_type = first_child.children[1]
-				if array_type.type in ("char", "UInt8"):
+				if array_type.type_hint == TypeTreeHint.Char or array_type.type_hint == TypeTreeHint.UInt8:
 					result = buf.read(size)
 				else:
 					result = []

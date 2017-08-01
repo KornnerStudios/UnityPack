@@ -2,7 +2,7 @@
 from .assetbundle import AssetBundle
 from .engine.preload_data import PreloadData
 from .engine.asset_bundle import AssetBundle as AssetBundleData, AssetInfo
-from .utils import to_serializable, printProgressBar
+from .utils import json_default, printProgressBar
 import json
 
 class AssetDependencyPPtr:
@@ -156,6 +156,8 @@ class AssetDependencyTable:
 				dobj.size = obj.size
 				dobj.set_name(obj, self.asset_bundle_data)
 
+			self.objects[dobj.path_id] = dobj
+
 
 class AssetDependencyDatabase:
 	def __init__(self):
@@ -169,7 +171,8 @@ class AssetDependencyDatabase:
 		table = AssetDependencyTable()
 		table.source_file = source_file
 		table.setup(asset)
+		self.dependency_table.append(table)
 
 	def write_to_json_file(self, json_path):
 		with open(json_path, "w") as json_file:
-			json_file.write(json.dumps(self, indent=4, default=to_serializable))
+			json_file.write(json.dumps(self, indent=4, default=json_default))

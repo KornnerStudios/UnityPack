@@ -51,14 +51,12 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
     percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
     filledLength = int(length * iteration // total)
     bar = fill * filledLength + '-' * (length - filledLength)
-    print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = '\r')
+    output = "\r%s |%s| %s%% %s" % (prefix, bar, percent, suffix)
+    print(output, end = '\r')
     # Print New Line on Complete
     if iteration == total:
-        prefix = ' ' * len(prefix)
-        bar = ' ' * length
-        percent = ' ' * len(percent)
-        suffix = ' ' * len(suffix)
-        print('\r%s  %s  %s  %s' % (prefix, bar, percent, suffix), end = '\r')
+        zero_output = ' ' * len(output)
+        print('\r%s' % (zero_output), end = '\r')
 
 def extract_audioclip_samples(d) -> dict:
 	"""
