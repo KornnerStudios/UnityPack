@@ -1,9 +1,18 @@
-﻿from .asset import Asset
+﻿from enum import IntEnum
+from .asset import Asset
 from .assetbundle import AssetBundle
 from .engine.preload_data import PreloadData
 from .engine.asset_bundle import AssetBundle as AssetBundleData, AssetInfo
 from .utils import json_default, printProgressBar
 import json
+import logging
+
+# forward declarations
+class AssetDependencyDatabase:
+	pass
+class AssetDependencyTable:
+	pass
+
 
 class AssetDependencyPPtr:
 	def __init__(self, obj_ptr):
@@ -13,6 +22,11 @@ class AssetDependencyPPtr:
 		else:
 			self.file_id = obj_ptr.file_id
 			self.path_id = obj_ptr.path_id
+
+	def __repr__(self):
+		return "(file_id=%r, path_id=%r)" % (
+			self.file_id, self.path_id
+		)
 
 	@property
 	def is_null(self):
@@ -40,6 +54,10 @@ class AssetDependencyPreloadData:
 
 		for obj_ptr in preload_data.m_Assets:
 			self.assets.append(AssetDependencyPPtr(obj_ptr))
+
+	def build_report(self, db: AssetDependencyDatabase, owner_table: AssetDependencyTable):
+		for asset in self.assets:
+			db.report.add_object_reference(db, owner_table, asset)
 
 class AssetDependencyAssetInfo:
 	def __init__(self, path, asset_info):
@@ -85,12 +103,28 @@ class AssetDependencyAssetBundleData:
 		if bundle_data.m_MainAsset is not None:
 			self.main_asset = AssetDependencyAssetBundlePreloadInfo(bundle_data.m_MainAsset)
 
+	def cleanup_setup_data(self):
+		if len(self.dependencies) == 0:
+			self.dependencies = None
+
+		del self.preload_table
+		del self.export_names_by_path_id
+
+		if self.main_asset is not None:
+			if self.main_asset.preload_size == 0 and self.main_asset.object_ptr.is_null:
+				self.main_asset = None
+
+	def build_report(self, db: AssetDependencyDatabase, owner_table: AssetDependencyTable):
+		for asset in self.preload_table:
+			db.report.add_object_reference(db, owner_table, asset)
+
 class AssetDependencyObject:
 	def __init__(self):
 		self.path_id = -1
 		self.unity_type = None
 		self.size = -1
 		self.name = None
+		self.referenced_by = None
 
 	def set_name(self, obj, asset_bundle_data: AssetDependencyAssetBundleData):
 		# try to avoid obj.read's, which will cause chunks to get compressed as needed
@@ -103,8 +137,18 @@ class AssetDependencyObject:
 		if name is not None:
 			self.name = name['m_Name']
 
+		if self.name == "":
+			self.name = None
+
+	def add_reference(self, db: AssetDependencyDatabase, src_table: AssetDependencyTable):
+		if self.referenced_by is None:
+			self.referenced_by = set()
+
+		self.referenced_by.add(src_table.name)
+
 class AssetDependencyTable:
 	def __init__(self):
+		self.table_index = -1
 		self.source_file = None
 		self.name = None
 		self.preload_data = None
@@ -114,6 +158,11 @@ class AssetDependencyTable:
 
 	def setup(self, asset: Asset):
 		self.name = asset.name
+
+		# fix standalone .asset or level files where the asset.name returns the file path
+		last_slash = self.name.rfind('\\')
+		if last_slash >= 0:
+			self.name = self.name[last_slash+1:]
 
 		for ref in asset.external_refs:
 			if ref == asset:
@@ -158,10 +207,63 @@ class AssetDependencyTable:
 
 			self.objects[dobj.path_id] = dobj
 
+	def build_report(self, db: AssetDependencyDatabase):
+		if self.preload_data is not None:
+			self.preload_data.build_report(db, self)
+
+		if self.asset_bundle_data is not None:
+			self.asset_bundle_data.build_report(db, self)
+
+	def cleanup_setup_data(self):
+		if self.asset_bundle_data is not None:
+			self.asset_bundle_data.cleanup_setup_data()
+
+		ks = [k for k,v in self.objects.items() if v.referenced_by==None]
+		for k in ks:
+			self.objects.pop(k)
+		# HACK TEMP
+		#self.objects = None
+
+	def get_external_ref_name(self, file_id: int) -> str:
+		if file_id == 0:
+			return name.lower()
+
+		for index, ref_path in enumerate(self.external_refs):
+			if (index+1) == file_id:
+				return AssetDependencyDatabase.external_ref_path_to_name(ref_path)
+
+		return None
+
+
+class AssetDependencyReport:
+	def __init__(self):
+		pass
+
+	def add_object_reference(self, db: AssetDependencyDatabase, src_table: AssetDependencyTable, obj_ptr: AssetDependencyPPtr):
+		if obj_ptr.is_null:
+			return
+		# skip local files
+		if obj_ptr.file_id == 0:
+			return
+
+		external_ref_name = src_table.get_external_ref_name(obj_ptr.file_id)
+		external_ref_table_index = db.external_ref_name_to_table_index[external_ref_name]
+		external_ref_table = db.dependency_table[external_ref_table_index]
+
+		if obj_ptr.path_id not in external_ref_table.objects:
+			#raise Exception("{0} in {1} not in {2}".format(obj_ptr, src_table.name, external_ref_name))
+			logging.warning("{0} in {1} not in {2}".format(obj_ptr, src_table.name, external_ref_name))
+			return
+
+		external_obj = external_ref_table.objects[obj_ptr.path_id]
+		external_obj.add_reference(db, src_table)
+
 
 class AssetDependencyDatabase:
 	def __init__(self):
 		self.dependency_table = []
+		self.external_ref_name_to_table_index = {}
+		self.report = AssetDependencyReport()
 
 	def build_from_bundle(self, source_file: str, bundle: AssetBundle):
 		for asset in bundle.assets:
@@ -171,8 +273,29 @@ class AssetDependencyDatabase:
 		table = AssetDependencyTable()
 		table.source_file = source_file
 		table.setup(asset)
-		self.dependency_table.append(table)
 
-	def write_to_json_file(self, json_path):
+		# NOTE variant bundles all have the same name (CAB-...), so skip everything but the first encountered variant
+		if table.name.lower() in self.external_ref_name_to_table_index:
+			return
+		
+		table.table_index = len(self.dependency_table)
+		self.dependency_table.append(table)
+		self.external_ref_name_to_table_index[table.name.lower()] = table.table_index
+
+	def write_to_json_file(self, json_path: str):
+		for table in self.dependency_table:
+			table.build_report(self)
+
+		for table in self.dependency_table:
+			table.cleanup_setup_data()
+
 		with open(json_path, "w") as json_file:
 			json_file.write(json.dumps(self, indent=4, default=json_default))
+
+	@classmethod
+	def external_ref_path_to_name(cls, ref_path: str) -> str:
+		last_forward_slash = ref_path.rfind('/')
+		if last_forward_slash < 0:
+			return ref_path
+
+		return ref_path[last_forward_slash+1:]

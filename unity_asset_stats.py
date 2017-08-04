@@ -197,7 +197,7 @@ class UnityAssetStats:
 			file_ex = '.json'
 
 		for f in os.listdir(self.args.path_to_assets):
-			if f.startswith("level"):
+			if f.startswith("level") and not f.endswith(".resS"):
 				if not self.args.art_dump_summary and f.endswith('.json'):
 					continue
 				if self.args.art_dump_summary and not f.endswith('.json'):
