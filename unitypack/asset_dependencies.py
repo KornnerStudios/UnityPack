@@ -55,6 +55,13 @@ class AssetDependencyPreloadData:
 		for obj_ptr in preload_data.m_Assets:
 			self.assets.append(AssetDependencyPPtr(obj_ptr))
 
+	def cleanup_setup_data(self):
+		if len(self.dependencies) == 0:
+			self.dependencies = None
+
+		# don't need this since it's processed when building reports
+		del self.preload_table
+
 	def build_report(self, db: AssetDependencyDatabase, owner_table: AssetDependencyTable):
 		for asset in self.assets:
 			db.report.add_object_reference(db, owner_table, asset)
@@ -107,7 +114,9 @@ class AssetDependencyAssetBundleData:
 		if len(self.dependencies) == 0:
 			self.dependencies = None
 
+		# don't need this since it's processed when building reports
 		del self.preload_table
+		# don't need this, it's just duplicate data
 		del self.export_names_by_path_id
 
 		if self.main_asset is not None:
@@ -215,14 +224,16 @@ class AssetDependencyTable:
 			self.asset_bundle_data.build_report(db, self)
 
 	def cleanup_setup_data(self):
+		if self.preload_data is not None:
+			self.preload_data.cleanup_setup_data()
+
 		if self.asset_bundle_data is not None:
 			self.asset_bundle_data.cleanup_setup_data()
 
+		# cull objects which don't have any references
 		ks = [k for k,v in self.objects.items() if v.referenced_by==None]
 		for k in ks:
 			self.objects.pop(k)
-		# HACK TEMP
-		#self.objects = None
 
 	def get_external_ref_name(self, file_id: int) -> str:
 		if file_id == 0:
