@@ -60,7 +60,7 @@ class AssetDependencyPreloadData:
 			self.dependencies = None
 
 		# don't need this since it's processed when building reports
-		del self.preload_table
+		del self.assets
 
 	def build_report(self, db: AssetDependencyDatabase, owner_table: AssetDependencyTable):
 		for asset in self.assets:

@@ -182,7 +182,7 @@ class UnityAssetStats:
 		elif self.args.dep_summary:
 			if self.dependency_db is not None:
 				summary_path = self.get_output_path("dependency_summary" + ".json")
-				print("Writing dependency summary " + "" + "...", end='', flush=True)
+				print("Writing dependency summary " + "" + "...", flush=True)
 				self.dependency_db.write_to_json_file(summary_path)
 				print("Done")
 
