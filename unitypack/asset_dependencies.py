@@ -64,7 +64,7 @@ class AssetDependencyPreloadData:
 
 	def build_report(self, db: AssetDependencyDatabase, owner_table: AssetDependencyTable):
 		for asset in self.assets:
-			db.report.add_object_reference(db, owner_table, asset)
+			db.add_object_reference(owner_table, asset)
 
 class AssetDependencyAssetInfo:
 	def __init__(self, path, asset_info):
@@ -119,13 +119,15 @@ class AssetDependencyAssetBundleData:
 		# don't need this, it's just duplicate data
 		del self.export_names_by_path_id
 
+		del self.exports
+
 		if self.main_asset is not None:
 			if self.main_asset.preload_size == 0 and self.main_asset.object_ptr.is_null:
 				self.main_asset = None
 
 	def build_report(self, db: AssetDependencyDatabase, owner_table: AssetDependencyTable):
 		for asset in self.preload_table:
-			db.report.add_object_reference(db, owner_table, asset)
+			db.add_object_reference(owner_table, asset)
 
 class AssetDependencyObject:
 	def __init__(self):
@@ -149,7 +151,7 @@ class AssetDependencyObject:
 		if self.name == "":
 			self.name = None
 
-	def add_reference(self, db: AssetDependencyDatabase, src_table: AssetDependencyTable):
+	def add_reference(self, src_table: AssetDependencyTable):
 		if self.referenced_by is None:
 			self.referenced_by = set()
 
@@ -224,16 +226,27 @@ class AssetDependencyTable:
 			self.asset_bundle_data.build_report(db, self)
 
 	def cleanup_setup_data(self):
-		if self.preload_data is not None:
-			self.preload_data.cleanup_setup_data()
-
+		# gather list of unreferenced exports
 		if self.asset_bundle_data is not None:
-			self.asset_bundle_data.cleanup_setup_data()
+			self.unreferenced_objects = []
+			vs = [v for k,v in self.objects.items() if v.referenced_by==None and k in self.asset_bundle_data.export_names_by_path_id]
+			for v in vs:
+				self.unreferenced_objects.append(v.name)
+			if len(self.unreferenced_objects) == 0:
+				del self.unreferenced_objects
 
 		# cull objects which don't have any references
 		ks = [k for k,v in self.objects.items() if v.referenced_by==None]
 		for k in ks:
 			self.objects.pop(k)
+		if len(self.objects) == 0:
+			del self.objects
+
+		if self.preload_data is not None:
+			self.preload_data.cleanup_setup_data()
+
+		if self.asset_bundle_data is not None:
+			self.asset_bundle_data.cleanup_setup_data()
 
 	def get_external_ref_name(self, file_id: int) -> str:
 		if file_id == 0:
@@ -246,35 +259,10 @@ class AssetDependencyTable:
 		return None
 
 
-class AssetDependencyReport:
-	def __init__(self):
-		pass
-
-	def add_object_reference(self, db: AssetDependencyDatabase, src_table: AssetDependencyTable, obj_ptr: AssetDependencyPPtr):
-		if obj_ptr.is_null:
-			return
-		# skip local files
-		if obj_ptr.file_id == 0:
-			return
-
-		external_ref_name = src_table.get_external_ref_name(obj_ptr.file_id)
-		external_ref_table_index = db.external_ref_name_to_table_index[external_ref_name]
-		external_ref_table = db.dependency_table[external_ref_table_index]
-
-		if obj_ptr.path_id not in external_ref_table.objects:
-			#raise Exception("{0} in {1} not in {2}".format(obj_ptr, src_table.name, external_ref_name))
-			logging.warning("{0} in {1} not in {2}".format(obj_ptr, src_table.name, external_ref_name))
-			return
-
-		external_obj = external_ref_table.objects[obj_ptr.path_id]
-		external_obj.add_reference(db, src_table)
-
-
 class AssetDependencyDatabase:
 	def __init__(self):
 		self.dependency_table = []
 		self.external_ref_name_to_table_index = {}
-		self.report = AssetDependencyReport()
 
 	def build_from_bundle(self, source_file: str, bundle: AssetBundle):
 		for asset in bundle.assets:
@@ -292,6 +280,25 @@ class AssetDependencyDatabase:
 		table.table_index = len(self.dependency_table)
 		self.dependency_table.append(table)
 		self.external_ref_name_to_table_index[table.name.lower()] = table.table_index
+
+	def add_object_reference(self, src_table: AssetDependencyTable, obj_ptr: AssetDependencyPPtr):
+		if obj_ptr.is_null:
+			return
+		# skip local files
+		if obj_ptr.file_id == 0:
+			return
+
+		external_ref_name = src_table.get_external_ref_name(obj_ptr.file_id)
+		external_ref_table_index = self.external_ref_name_to_table_index[external_ref_name]
+		external_ref_table = self.dependency_table[external_ref_table_index]
+
+		if obj_ptr.path_id not in external_ref_table.objects:
+			#raise Exception("{0} in {1} not in {2}".format(obj_ptr, src_table.name, external_ref_name))
+			logging.warning("{0} in {1} not in {2}".format(obj_ptr, src_table.name, external_ref_name))
+			return
+
+		external_obj = external_ref_table.objects[obj_ptr.path_id]
+		external_obj.add_reference(src_table)
 
 	def write_to_json_file(self, json_path: str):
 		for table in self.dependency_table:
