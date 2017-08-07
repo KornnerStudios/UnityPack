@@ -165,6 +165,7 @@ class AssetDependencyTable:
 		self.preload_data = None
 		self.asset_bundle_data = None
 		self.external_refs = []
+		self.referenced_by = None
 		self.objects = {}
 
 	def setup(self, asset: Asset):
@@ -225,15 +226,25 @@ class AssetDependencyTable:
 		if self.asset_bundle_data is not None:
 			self.asset_bundle_data.build_report(db, self)
 
+		for external_ref_path in self.external_refs:
+			external_ref_name = AssetDependencyDatabase.external_ref_path_to_name(external_ref_path)
+			db.add_asset_reference(self, external_ref_name)
+
 	def cleanup_setup_data(self):
 		# gather list of unreferenced exports
 		if self.asset_bundle_data is not None:
+			self.unreferenced_bytes = 0
 			self.unreferenced_objects = []
+			unreferenced_bytes = 0
 			vs = [v for k,v in self.objects.items() if v.referenced_by==None and k in self.asset_bundle_data.export_names_by_path_id]
 			for v in vs:
 				self.unreferenced_objects.append(v.name)
+				self.unreferenced_bytes += v.size
 			if len(self.unreferenced_objects) == 0:
 				del self.unreferenced_objects
+				del self.unreferenced_bytes
+			else:
+				self.unreferenced_objects.sort()
 
 		# cull objects which don't have any references
 		ks = [k for k,v in self.objects.items() if v.referenced_by==None]
@@ -257,6 +268,12 @@ class AssetDependencyTable:
 				return AssetDependencyDatabase.external_ref_path_to_name(ref_path)
 
 		return None
+
+	def add_reference(self, src_table: AssetDependencyTable):
+		if self.referenced_by is None:
+			self.referenced_by = set()
+
+		self.referenced_by.add(src_table.name)
 
 
 class AssetDependencyDatabase:
@@ -300,12 +317,24 @@ class AssetDependencyDatabase:
 		external_obj = external_ref_table.objects[obj_ptr.path_id]
 		external_obj.add_reference(src_table)
 
+	def add_asset_reference(self, src_table: AssetDependencyTable, external_ref_name: str):
+		external_ref_table_index = self.external_ref_name_to_table_index[external_ref_name]
+		external_ref_table = self.dependency_table[external_ref_table_index]
+
+		external_ref_table.add_reference(src_table)
+
 	def write_to_json_file(self, json_path: str):
 		for table in self.dependency_table:
 			table.build_report(self)
 
 		for table in self.dependency_table:
 			table.cleanup_setup_data()
+
+		# cull tables which don't have any references
+		# will also cull .sharedAssets from scene bundles which don't have any actual exported objects
+		ts = [t for t in self.dependency_table if t.referenced_by==None or not hasattr(t, 'objects')]
+		for t in ts:
+			self.dependency_table.remove(t)
 
 		with open(json_path, "w") as json_file:
 			json_file.write(json.dumps(self, indent=4, default=json_default))
