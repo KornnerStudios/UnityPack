@@ -242,4 +242,6 @@
   "1112": "SubstanceImporter",
   "1113": "LightmapParameters",
   "1120": "LightmapSnapshot",
+  "1125": "BuildReport",
+  "1126": "PackedAssets"
 }

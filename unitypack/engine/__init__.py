@@ -16,4 +16,5 @@ from .texture import Material, Sprite, Texture2D, StreamingInfo
 from .asset_bundle import AssetBundle
 from .preload_data import PreloadData
 from .shader import Shader
+from .build_report import BuildReport, PackedAssets
 
