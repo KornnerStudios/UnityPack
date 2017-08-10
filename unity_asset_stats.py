@@ -7,7 +7,7 @@ from argparse import ArgumentParser
 from io import BytesIO
 from unitypack.asset import Asset
 from unitypack.export import OBJMesh
-from unitypack.utils import extract_audioclip_samples
+from unitypack.utils import extract_audioclip_samples, json_default
 from unitypack.asset_dependencies import AssetDependencyDatabase
 import json
 
@@ -136,7 +136,7 @@ class UnityAssetStats:
 						json_path = file + ".json"
 						if self.write_json_data:
 							with open(json_path, "w") as json_file:
-								json_file.write(json.dumps(self.json_data, indent=4))
+								json_file.write(json.dumps(self.json_data, indent=4, default=json_default))
 						else:
 							print("Not writing JSON...", end='')
 
@@ -298,9 +298,11 @@ class UnityAssetStats:
 
 			obj_json = None
 
-			if obj.type == "Shader" and id != 2841:
+			if obj.type == "BuildReport" or obj.type == "PackedAssets":
 				d = obj.read()
 				d = d
+				asset_json[obj.path_id] = d.to_json_data()
+				continue
 
 			if obj.type == "AssetBundle":
 				d = obj.read()

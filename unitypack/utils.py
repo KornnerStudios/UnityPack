@@ -102,7 +102,11 @@ class BinaryReader:
 			self.seek(new - old, SEEK_CUR)
 
 	def read(self, *args):
-		return self.buf.read(*args)
+		buffer = self.buf.read(*args)
+		size = args[0]
+		if size != len(buffer):
+			raise IOError("Requested {0} bytes but {1} buffer only gave {2}".format(size, self.buf.__class__, len(buffer)))
+		return buffer
 
 	def seek(self, *args):
 		return self.buf.seek(*args)

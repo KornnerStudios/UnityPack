@@ -1,4 +1,4 @@
-﻿from enum import IntEnum
+﻿from enum import IntEnum, IntFlag
 from io import BytesIO
 from .enums import BuildTargetPlatform
 from .resources import get_resource, STRINGS_DAT
@@ -18,11 +18,34 @@ class TypeTreeHint(IntEnum):
 	UInt64 = 10
 	Float = 11
 	String = 12
-	Other = 13
+	TypePtr = 13
+	GUID = 14
+	Other = 15
+
+
+class TypeTreeFlags(IntFlag):
+	HideInEditor = 1<<0
+	NotEditable = 1<<4
+	StrongPPtr = 1<<6
+	TreatIntegerValueAsBoolean = 1<<8
+	DebugProperty = 1<<12
+	AlignBytes = 1<<14
+	AnyChildUsesAlignBytes = 1<<15
+	IgnoreInMetaFiles = 1<<19
+	TransferAsArrayEntryNameInMetaFiles = 1<<20
+	TransferUsingFlowMappingStyle = 1<<21
+	GenerateBitwiseDifferences = 1<<22
+	DontAnimate = 1<<23
+	TransferHex64 = 1<<24
+	CharProperty = 1<<25
+	DontValidateUTF8 = 1<<26
+
 
 
 class TypeTree:
 	NULL = "(null)"
+	kCommonStringBit = 0x80000000
+	kStringOffsetMask = ~kCommonStringBit
 
 	def __init__(self, format):
 		self.children = []
@@ -40,6 +63,15 @@ class TypeTree:
 		return "<%s %s (size=%r, index=%r, is_array=%r, flags=%r)>" % (
 			self.type, self.name, self.size, self.index, self.is_array, self.flags
 		)
+
+	def pretty(self, depth=1):
+		ret = []
+		indent = "\t" * depth
+		for child in self.children:
+			ret.append(indent + repr(child))
+			if len(child.children) > 0:
+				ret.append(child.pretty(depth + 1))
+		return "\n".join(ret)
 
 	@property
 	def post_align(self):
@@ -91,22 +123,23 @@ class TypeTree:
 
 			curr.version = version
 			curr.is_array = buf.read_byte()
-			curr.type = self.get_string(buf.read_int())
-			curr.name = self.get_string(buf.read_int())
+			curr.type = self.get_string(buf.read_uint())
+			curr.name = self.get_string(buf.read_uint())
 			curr.size = buf.read_int()
 			curr.index = buf.read_uint()
 			curr.flags = buf.read_int()
 			curr.type_hint = self.get_type_hint_index(curr.type)
 
 	def get_string(self, offset):
-		if offset < 0:
-			offset &= 0x7fffffff
+		is_common_string = offset & TypeTree.kCommonStringBit
+		data_offset = offset & TypeTree.kStringOffsetMask
+		if is_common_string > 0:
 			data = STRINGS_DAT
-		elif offset < self.buffer_bytes:
-			data = self.data
 		else:
-			return self.NULL
-		return data[offset:].partition(b"\0")[0].decode("utf-8")
+			data = self.data
+
+		result = data[data_offset:].partition(b"\0")[0].decode("utf-8")
+		return result
 
 	def get_type_hint_index(self, t: str) -> TypeTreeHint:
 		if t == "bool":
@@ -133,6 +166,10 @@ class TypeTree:
 			return TypeTreeHint.Float
 		elif t == "string":
 			return TypeTreeHint.String
+		elif t == "Type*":
+			return TypeTreeHint.TypePtr
+		elif t == "GUID":
+			return TypeTreeHint.GUID
 		elif t == self.NULL:
 			return TypeTreeHint.NULL
 		else:
@@ -162,7 +199,7 @@ class TypeMetadata:
 		if format is None:
 			format = self.asset.format
 		self.generator_version = buf.read_string()
-		self.target_platform = BuildTargetPlatform(buf.read_uint())
+		self.target_platform = BuildTargetPlatform(buf.read_int())
 
 		if format >= 13:
 			has_type_trees = buf.read_boolean()

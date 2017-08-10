@@ -37,6 +37,9 @@
     <Compile Include="unitypack\engine\animation.py" />
     <Compile Include="unitypack\engine\asset_bundle.py" />
     <Compile Include="unitypack\engine\audio.py" />
+    <Compile Include="unitypack\engine\build_report.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="unitypack\engine\component.py" />
     <Compile Include="unitypack\engine\font.py" />
     <Compile Include="unitypack\engine\mesh.py" />

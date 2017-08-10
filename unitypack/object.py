@@ -5,6 +5,8 @@ from . import engine as UnityEngine
 from .resources import UnityClass
 from .type import TypeMetadata, TypeTree, TypeTreeHint
 from .utils import BinaryReader
+from binascii import hexlify
+from uuid import UUID
 
 
 def load_object(type, obj):
@@ -87,12 +89,12 @@ class ObjectInfo:
 
 	def read(self):
 		buf = self.asset._buf
-		try:
-			buf.seek(self.asset._buf_ofs + self.data_offset)
-			object_buf = buf.read(self.size)
-			result = self.read_value(self.type_tree, BinaryReader(BytesIO(object_buf)))
-		except ValueError:
-			return self.read_name_only()
+		#try:
+		buf.seek(self.asset._buf_ofs + self.data_offset)
+		object_buf = buf.read(self.size)
+		result = self.read_value(self.type_tree, BinaryReader(BytesIO(object_buf)))
+		#except ValueError:
+		#	return self.read_name_only()
 		return result
 
 	def read_name_only(self):
@@ -154,6 +156,10 @@ class ObjectInfo:
 			#	size = size
 			result = buf.read_string(size)
 			align = type.children[0].post_align
+		elif th == TypeTreeHint.TypePtr:
+			result = buf.read_uint()
+		elif th == TypeTreeHint.GUID:
+			result = str( UUID(hexlify(buf.read(16)).decode("utf-8")) )
 		else:
 			if type.is_array:
 				first_child = type
@@ -166,7 +172,7 @@ class ObjectInfo:
 
 			elif first_child and first_child.is_array:
 				align = first_child.post_align
-				size = buf.read_uint()
+				size = buf.read_int()
 				array_type = first_child.children[1]
 				if array_type.type_hint == TypeTreeHint.Char or array_type.type_hint == TypeTreeHint.UInt8:
 					result = buf.read(size)
@@ -183,7 +189,11 @@ class ObjectInfo:
 				result = OrderedDict()
 
 				for child in type.children:
-					result[child.name] = self.read_value(child, buf)
+					try:
+						result[child.name] = self.read_value(child, buf)
+					except (IOError, ValueError) as e:
+						logging.warn("\n{0}\n{1}\n{2}\n{3}".format(child.name, e, self.type_tree.pretty(), result))
+						raise
 
 				result = load_object(type, result)
 				if t == "StreamedResource":
