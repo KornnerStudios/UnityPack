@@ -1,14 +1,42 @@
 ﻿from enum import IntEnum, IntFlag
 from typing import List
 from .component import Component
-from .object import Object, field, field_list
+from .object import Object, field, field_list, field_dict
 from .texture import TextureDimension
 
 
+class SerializedSubProgram(Object):
+	m_BlobIndex = field("m_BlobIndex", int) #unsigned
+	m_Channels = field("m_Channels")
+	m_KeywordIndices = field_list("m_KeywordIndices", int) #UInt16
+	m_ShaderHardwareTier = field("m_ShaderHardwareTier", int) #SInt8
+	m_GpuProgramType = field("m_GpuProgramType", int) #SInt8
+
+
+class SerializedProgram(Object):
+	m_SubPrograms = field_list("m_SubPrograms", SerializedSubProgram)
+
+
+class SerializedPass(Object):
+	m_NameIndices = field_dict("m_NameIndices", str, int)
+	m_Type = field("m_Type", int)
+	m_State = field("m_State")
+	m_ProgramMask = field("m_ProgramMask", int) #unsigned
+	progVertex = field("progVertex", SerializedProgram)
+	progFragment = field("progFragment", SerializedProgram)
+	progGeometry = field("progGeometry", SerializedProgram)
+	progHull = field("progHull", SerializedProgram)
+	progDomain = field("progDomain", SerializedProgram)
+	m_HasInstancingVariant = field("m_HasInstancingVariant", bool)
+	m_UseName = field("m_UseName", str)
+	m_TextureName = field("m_TextureName", str)
+	m_Tags = field_dict("m_Tags", str, str)
+
+
 class SerializedSubShader(Object):
-	m_Passes = field("m_Passes")
-	m_Tags = field("m_Tags")
-	m_LOD = field("m_LOD")
+	m_Passes = field_list("m_Passes", SerializedPass)
+	m_Tags = field_dict("m_Tags", str, str)
+	m_LOD = field("m_LOD", int)
 
 
 class SerializedTextureProperty(Object):

@@ -230,6 +230,7 @@ class AssetDependencyTable:
 			external_ref_name = AssetDependencyDatabase.external_ref_path_to_name(external_ref_path)
 			db.add_asset_reference(self, external_ref_name)
 
+
 	def cleanup_setup_data(self):
 		# gather list of unreferenced exports
 		if self.asset_bundle_data is not None:
@@ -306,6 +307,9 @@ class AssetDependencyDatabase:
 			return
 
 		external_ref_name = src_table.get_external_ref_name(obj_ptr.file_id)
+		# NOTE if the name isn't in the table, the asset wasn't loaded for dependency analysis
+		if external_ref_name not in self.external_ref_name_to_table_index:
+			return
 		external_ref_table_index = self.external_ref_name_to_table_index[external_ref_name]
 		external_ref_table = self.dependency_table[external_ref_table_index]
 
@@ -318,6 +322,9 @@ class AssetDependencyDatabase:
 		external_obj.add_reference(src_table)
 
 	def add_asset_reference(self, src_table: AssetDependencyTable, external_ref_name: str):
+		# NOTE if the name isn't in the table, the asset wasn't loaded for dependency analysis
+		if external_ref_name not in self.external_ref_name_to_table_index:
+			return
 		external_ref_table_index = self.external_ref_name_to_table_index[external_ref_name]
 		external_ref_table = self.dependency_table[external_ref_table_index]
 
