@@ -87,6 +87,7 @@ class PackedAssets_C:
 		self.m_ShortPath = obj.m_ShortPath
 		self.m_Overhead = obj.m_Overhead
 		self.m_Contents = [BuildReportPackedAssetInfo_C(o) for o in obj.m_Contents]
+		self.m_Contents.sort(key=lambda x: x.packedSize, reverse=True)
 class BuildSummary_C:
 	def __init__(self, obj: BuildSummary):
 		self.name = obj.name
